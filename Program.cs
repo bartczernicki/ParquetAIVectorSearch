@@ -16,37 +16,42 @@ namespace ParquetFilesPerformanceTest
 
             Console.WriteLine("Parquet File Test");
 
-            using (var parquetReader = new ParquetFileReader(parquet_file_path))
+            foreach(var parquet_file in parquet_files)
             {
-                // Metadata
-                int numColumns = parquetReader.FileMetaData.NumColumns;
-                long numRows = parquetReader.FileMetaData.NumRows;
-                int numRowGroups = parquetReader.FileMetaData.NumRowGroups;
-                IReadOnlyDictionary<string, string> metadata = parquetReader.FileMetaData.KeyValueMetadata;
-
-                SchemaDescriptor schema = parquetReader.FileMetaData.Schema;
-                for (int columnIndex = 0; columnIndex < schema.NumColumns; ++columnIndex)
+                using (var parquetReader = new ParquetFileReader(parquet_file))
                 {
-                    ColumnDescriptor column = schema.Column(columnIndex);
-                    string columnName = column.Name;
-                    var dataType = column.LogicalType;
-                    string dataTypeString = dataType.ToString();
-                }
+                    Console.WriteLine($"{parquet_file}");
 
-                for (int rowGroup = 0; rowGroup < parquetReader.FileMetaData.NumRowGroups; ++rowGroup)
-                {
-                    using (var rowGroupReader = parquetReader.RowGroup(rowGroup))
+                    // Metadata
+                    int numColumns = parquetReader.FileMetaData.NumColumns;
+                    long numRows = parquetReader.FileMetaData.NumRows;
+                    int numRowGroups = parquetReader.FileMetaData.NumRowGroups;
+                    IReadOnlyDictionary<string, string> metadata = parquetReader.FileMetaData.KeyValueMetadata;
+
+                    SchemaDescriptor schema = parquetReader.FileMetaData.Schema;
+                    for (int columnIndex = 0; columnIndex < schema.NumColumns; ++columnIndex)
                     {
-                        long groupNumRows = rowGroupReader.MetaData.NumRows;
-
-                        var ids = rowGroupReader.Column(0).LogicalReader<string>().ReadAll(100);
-                        var titles = rowGroupReader.Column(1).LogicalReader<string>().ReadAll(100);
-                        var texts = rowGroupReader.Column(2).LogicalReader<string>().ReadAll(100);
-                        var embeddings = rowGroupReader.Column(3).LogicalReader<double?[]>().ReadAll(100);
+                        ColumnDescriptor column = schema.Column(columnIndex);
+                        string columnName = column.Name;
+                        var dataType = column.LogicalType;
+                        string dataTypeString = dataType.ToString();
                     }
-                }
 
-                parquetReader.Close();
+                    for (int rowGroup = 0; rowGroup < parquetReader.FileMetaData.NumRowGroups; ++rowGroup)
+                    {
+                        using (var rowGroupReader = parquetReader.RowGroup(rowGroup))
+                        {
+                            long groupNumRows = rowGroupReader.MetaData.NumRows;
+
+                            var ids = rowGroupReader.Column(0).LogicalReader<string>().ReadAll(100);
+                            var titles = rowGroupReader.Column(1).LogicalReader<string>().ReadAll(100);
+                            var texts = rowGroupReader.Column(2).LogicalReader<string>().ReadAll(100);
+                            var embeddings = rowGroupReader.Column(3).LogicalReader<double?[]>().ReadAll(100);
+                        }
+                    }
+
+                    parquetReader.Close();
+                }
             }
         }
     }
