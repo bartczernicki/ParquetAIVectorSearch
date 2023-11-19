@@ -54,7 +54,7 @@ namespace ParquetFilesPerformanceTest
                         using (var rowGroupReader = parquetReader.RowGroup(rowGroup))
                         {
                             var groupNumRows = (int)rowGroupReader.MetaData.NumRows;
-                            recordCount += groupNumRows;
+                            recordCount += groupNumRows; //Used to match processed and records inserted into ConcurrentBag
 
                             var ids = rowGroupReader.Column(0).LogicalReader<string>().ReadAll(groupNumRows);
                             var titles = rowGroupReader.Column(1).LogicalReader<string>().ReadAll(groupNumRows);
@@ -86,21 +86,5 @@ namespace ParquetFilesPerformanceTest
             Console.WriteLine($"Total Records Processed: {recordCount}");
             Console.WriteLine($"Total Records in Concurrent Bag: {dataSetDbPedias.Count}");
         }
-
-        //static void MergeColumns(string[] ids, string[] titles, string[] texts, double?[][]? embeddings)
-        //{
-        //    for (int i = 0; i < ids.Length; i++)
-        //    {
-        //        var item = new DbPedia
-        //        {
-        //            Id = ids[0],
-        //            Title = titles[i],
-        //            Text = texts[i],
-        //            Embeddings = embeddings[i].Select(x => x).ToList()
-        //        };
-
-        //        dbPediaDataSet.Add(item);
-        //    }
-        //}
     }
 }
