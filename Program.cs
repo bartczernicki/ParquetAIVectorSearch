@@ -8,9 +8,11 @@ namespace ParquetFilesPerformanceTest
     {
         static void Main(string[] args)
         {
-            var parquet_files_directory = @"c:\users\bart\downloads\";
-            var parquet_file_path_base = @"train-00025-of-00026-769064ea76815001.parquet";
-            var parquet_file_path = Path.Combine(parquet_files_directory, parquet_file_path_base);
+            // https://huggingface.co/datasets/KShivendu/dbpedia-entities-openai-1M 
+            var parquet_files_directory = @"e:\data\dbpedia-entities-openai-1M\";
+            var parquet_file_path_suffix = @"*.parquet";
+            var parquet_files = Directory.GetFiles(parquet_files_directory, parquet_file_path_suffix);
+            var parquet_file_path = parquet_files.FirstOrDefault();
 
             Console.WriteLine("Parquet File Test");
 
