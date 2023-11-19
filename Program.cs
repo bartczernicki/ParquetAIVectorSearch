@@ -1,5 +1,6 @@
 ﻿using ParquetSharp;
 using ParquetSharp.Arrow;
+using ParquetSharp.RowOriented;
 using System.IO;
 
 namespace ParquetFilesPerformanceTest
@@ -16,13 +17,14 @@ namespace ParquetFilesPerformanceTest
 
             Console.WriteLine("Parquet File Test");
 
-            foreach(var parquet_file in parquet_files)
+            Parallel.ForEach(parquet_files, parquet_file =>
+            //foreach (var parquet_file in parquet_files)
             {
                 using (var parquetReader = new ParquetFileReader(parquet_file))
                 {
-                    Console.WriteLine($"{parquet_file}");
+                    Console.WriteLine($"File: {parquet_file}");
 
-                    // Metadata
+                    // Read Metadata
                     int numColumns = parquetReader.FileMetaData.NumColumns;
                     long numRows = parquetReader.FileMetaData.NumRows;
                     int numRowGroups = parquetReader.FileMetaData.NumRowGroups;
@@ -41,18 +43,20 @@ namespace ParquetFilesPerformanceTest
                     {
                         using (var rowGroupReader = parquetReader.RowGroup(rowGroup))
                         {
-                            long groupNumRows = rowGroupReader.MetaData.NumRows;
+                            var groupNumRows = (int)rowGroupReader.MetaData.NumRows;
 
-                            var ids = rowGroupReader.Column(0).LogicalReader<string>().ReadAll(100);
-                            var titles = rowGroupReader.Column(1).LogicalReader<string>().ReadAll(100);
-                            var texts = rowGroupReader.Column(2).LogicalReader<string>().ReadAll(100);
-                            var embeddings = rowGroupReader.Column(3).LogicalReader<double?[]>().ReadAll(100);
+                            var ids = rowGroupReader.Column(0).LogicalReader<string>().ReadAll(groupNumRows);
+                            var titles = rowGroupReader.Column(1).LogicalReader<string>().ReadAll(groupNumRows);
+                            var texts = rowGroupReader.Column(2).LogicalReader<string>().ReadAll(groupNumRows);
+                            var embeddings = rowGroupReader.Column(3).LogicalReader<double?[]>().ReadAll(groupNumRows);
+
+                            Console.WriteLine($"File: {parquet_file} - Processed: {groupNumRows} rows.");
                         }
                     }
 
                     parquetReader.Close();
                 }
-            }
+            });
         }
     }
 }
