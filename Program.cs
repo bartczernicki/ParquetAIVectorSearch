@@ -96,22 +96,23 @@ namespace ParquetAIVectorSearch
 
 
             Console.WriteLine($"Build ANN Graph using HNSW...");
-            var NumVectors = dataSetDbPedias.Count;
+            var NumVectors = 5000; // dataSetDbPedias.Count;
             var batchSize = 5000;
 
-            var hnswGraphparameters = new SmallWorld<float[], float>.Parameters()
+            var hnswGraphParameters = new SmallWorld<float[], float>.Parameters()
             {
                 M = 15,
                 LevelLambda = 1 / Math.Log(15)
             };
 
             var graph = new SmallWorld<float[], float>(CosineDistance.SIMD, DefaultRandomGenerator.Instance,
-                hnswGraphparameters, threadSafe: true);
+                hnswGraphParameters, threadSafe: true);
             var sampleVectors = dataSetDbPedias.Select(x => x.Embeddings.ToArray()).ToList();
 
-            for (int i = 0; i < (recordCount / batchSize); i++)
+            for (int i = 0; i < (NumVectors / batchSize); i++)
             {
-                graph.AddItems(sampleVectors.Skip(i * batchSize).Take(batchSize).ToArray());
+                var batch = sampleVectors.Skip(i * batchSize).Take(batchSize).ToList();
+                graph.AddItems(batch);
                 Console.WriteLine($"\nAdded {i + 1} of {NumVectors / batchSize}\n");
             }
 
@@ -119,7 +120,7 @@ namespace ParquetAIVectorSearch
             Console.WriteLine($"Time Taken to build ANN Graph: {(endTimeOfGraphBuild - endTimeOfParquetLoad).TotalSeconds} seconds");
 
 
-            var searchVector = RandomVectors(1536, 1)[0];
+            var searchVector = sampleVectors[0];// RandomVectors(1536, 1)[0];
             var results = graph.KNNSearch(searchVector, 20);
 
             //var results = new List<VectorScore>(NumVectors);
