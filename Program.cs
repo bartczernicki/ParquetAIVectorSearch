@@ -4,11 +4,14 @@ using ParquetSharp.RowOriented;
 using System.Collections.Concurrent;
 using System.IO;
 using System.Runtime.CompilerServices;
+using HNSW.Net;
 
 namespace ParquetAIVectorSearch
 {
     internal class Program
     {
+        // Note this will not run on ARM processors
+
         private const string PARQUET_FILES_DIRECTORY = @"c:\data\dbpedia-entities-openai-1M\";
         private const string PARQUET_FILE_PATH_SUFFIX = @"*.parquet";
 
@@ -83,7 +86,7 @@ namespace ParquetAIVectorSearch
                 }
             });
 
-            // Get elapsed time
+            // Get elapsed time & counts
             Console.WriteLine($"Time Taken: {(DateTime.Now - startTime).TotalSeconds} seconds");
             Console.WriteLine($"Total Records Processed: {recordCount}");
             Console.WriteLine($"Total Records in Concurrent Bag: {dataSetDbPedias.Count}");
