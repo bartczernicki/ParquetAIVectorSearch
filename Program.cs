@@ -5,6 +5,7 @@ using System.Collections.Concurrent;
 using System.IO;
 using System.Runtime.CompilerServices;
 using HNSW.Net;
+using System.Collections.Frozen;
 
 namespace ParquetAIVectorSearch
 {
@@ -86,10 +87,24 @@ namespace ParquetAIVectorSearch
                 }
             });
 
-            // Get elapsed time & counts
+            // Parquet File Load - Get elapsed time & counts
             Console.WriteLine($"Time Taken: {(DateTime.Now - startTime).TotalSeconds} seconds");
             Console.WriteLine($"Total Records Processed: {recordCount}");
             Console.WriteLine($"Total Records in Concurrent Bag: {dataSetDbPedias.Count}");
+
+
+            var hnswGraphparameters = new SmallWorld<float[], float>.Parameters()
+            {
+                M = 15,
+                LevelLambda = 1 / Math.Log(15)
+            };
+
+            var graph = new SmallWorld<float[], float>(CosineDistance.SIMD, DefaultRandomGenerator.Instance,
+                hnswGraphparameters, threadSafe: true);
+            var sampleVectors = dataSetDbPedias.Select(x => x.Embeddings.ToArray()).ToList().ToFrozenSet();
+
+
+
         }
     }
 }
