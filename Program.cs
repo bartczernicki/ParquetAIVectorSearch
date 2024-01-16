@@ -7,6 +7,9 @@ using System.Runtime.CompilerServices;
 using HNSW.Net;
 using System.Collections.Frozen;
 using System.Numerics.Tensors;
+using System.Diagnostics;
+using System.Runtime.Serialization.Formatters.Binary;
+using System.Runtime.InteropServices;
 
 namespace ParquetAIVectorSearch
 {
@@ -16,6 +19,7 @@ namespace ParquetAIVectorSearch
 
         private const string PARQUET_FILES_DIRECTORY = @"c:\data\dbpedia-entities-openai-1M\";
         private const string PARQUET_FILE_PATH_SUFFIX = @"*.parquet";
+        private const string GRAPH_FILE_NAME_SMALL = @"CompleteGraph.hnsw";
 
         static void Main(string[] args)
         {
@@ -26,7 +30,6 @@ namespace ParquetAIVectorSearch
             var recordCount = 0;
 
             // https://huggingface.co/datasets/KShivendu/dbpedia-entities-openai-1M 
-
             var parquet_files = Directory.GetFiles(PARQUET_FILES_DIRECTORY, PARQUET_FILE_PATH_SUFFIX);
 
             var parallelOptions = new ParallelOptions
@@ -98,13 +101,17 @@ namespace ParquetAIVectorSearch
 
             Console.WriteLine($"Build ANN Graph using HNSW...");
             var NumVectors = dataSetDbPedias.Count;
-            var batchSize = 5000;
+            var batchSize = 10000;
 
             var hnswGraphParameters = new SmallWorld<float[], float>.Parameters()
             {
-                M = 15,
-                LevelLambda = 1 / Math.Log(15)
-            };
+                M = 10,
+                LevelLambda = 1 / Math.Log(10), // should match M
+                ExpandBestSelection = true,
+                KeepPrunedConnections = true,
+                EnableDistanceCacheForConstruction = true,
+                NeighbourHeuristic = NeighbourSelectionHeuristic.SelectHeuristic
+        };
 
             var graph = new SmallWorld<float[], float>(CosineDistance.SIMD, DefaultRandomGenerator.Instance,
                 hnswGraphParameters, threadSafe: true);
@@ -116,7 +123,7 @@ namespace ParquetAIVectorSearch
             {
                 var batch = sampleVectors.Skip(i * batchSize).Take(batchSize).ToList();
                 graph.AddItems(batch);
-                Console.WriteLine($"\nAdded {i + 1} of numberOfBatches \n");
+                Console.WriteLine($"\nAdded {i + 1} of {numberOfBatches} \n");
             }
 
             var endTimeOfGraphBuild = DateTime.Now;
@@ -126,33 +133,51 @@ namespace ParquetAIVectorSearch
             var searchVector = sampleVectors[0];// RandomVectors(1536, 1)[0];
             var results = graph.KNNSearch(searchVector, 20);
 
-            //var results = new List<VectorScore>(NumVectors);
-            //for (var i = 0; i != NumVectors; i++)
-            //{
-            //    ReadOnlySpan<float> singleVector = sampleVectors.Slice(i, 1)[0];
-            //    var similarityScore = TensorPrimitives.Dot(searchVector, singleVector);
-
-            //    results.Add(new VectorScore { VectorIndex = i, SimilarityScore = similarityScore });
-            //}
-
             var topMatches = results.OrderBy(a => a.Distance).Take(20);
             var endTimeOfSearch = DateTime.Now;
             Console.WriteLine($"Time Taken to search ANN Graph: {(endTimeOfSearch - endTimeOfGraphBuild).TotalSeconds} seconds");
+
+            // Serialize the HNSW Graph & Persist to disk
+            SaveHNSWGraph(graph, PARQUET_FILES_DIRECTORY, GRAPH_FILE_NAME_SMALL);
+
+            // De-Serialize the HNSW Graph & Persist to disk
+            var loadedGraph = LoadHNSWGraph(PARQUET_FILES_DIRECTORY, GRAPH_FILE_NAME_SMALL, sampleVectors);
+
+            var loadedGraphResults = loadedGraph.KNNSearch(searchVector, 20);
         }
 
-        private static List<float[]> RandomVectors(int vectorSize, int vectorsCount)
+        private static void SaveHNSWGraph(SmallWorld<float[], float> world, string directoryName, string fileName)
         {
-            var vectors = new List<float[]>();
+            var filePath = Path.Combine(directoryName, fileName);
+            Console.WriteLine($"Saving HNSW graph to '{filePath}'... ");
+            var startTimeOfSave = DateTime.Now;
 
-            for (int i = 0; i < vectorsCount; i++)
+            // Save the graph to disk (doesn't save the vector data)
+            using (var f = File.Open(filePath, FileMode.Create))
             {
-                var vector = new float[vectorSize];
-                DefaultRandomGenerator.Instance.NextFloats(vector);
-                VectorUtils.Normalize(vector);
-                vectors.Add(vector);
+                world.SerializeGraph(f);
             }
 
-            return vectors;
+            Console.WriteLine($"Time Taken to save ANN (HNSW) Graph: {(DateTime.Now - startTimeOfSave).TotalMilliseconds} ms.");
+        }
+
+        private static SmallWorld<float[], float> LoadHNSWGraph(string directoryName, string fileName, List<float[]> vectors)
+        {
+            var stopWatch = Stopwatch.StartNew();
+            stopWatch.Start();
+            var filePath = Path.Combine(directoryName, fileName);
+
+            SmallWorld<float[], float> graph;
+
+            using (var f = File.OpenRead(filePath))
+            {
+                graph = SmallWorld<float[], float>.DeserializeGraph(vectors, CosineDistance.SIMD, DefaultRandomGenerator.Instance, f, true);
+            }
+
+            stopWatch.Stop();
+            Console.WriteLine($"Time Taken to load ANN (HNSW) Graph: {stopWatch.ElapsedMilliseconds} ms.");
+
+            return graph;
         }
     }
 }
