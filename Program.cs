@@ -110,10 +110,12 @@ namespace ParquetAIVectorSearch
                 ExpandBestSelection = true,
                 KeepPrunedConnections = true,
                 EnableDistanceCacheForConstruction = true,
-                NeighbourHeuristic = NeighbourSelectionHeuristic.SelectHeuristic
+                NeighbourHeuristic = NeighbourSelectionHeuristic.SelectHeuristic,
+                InitialItemsSize = NumVectors,
+                InitialDistanceCacheSize = NumVectors * 1024
         };
 
-            var graph = new SmallWorld<float[], float>(CosineDistance.SIMD, DefaultRandomGenerator.Instance,
+            var graph = new SmallWorld<float[], float>(CosineDistance.DotProductDotNetOptimized, DefaultRandomGenerator.Instance,
                 hnswGraphParameters, threadSafe: true);
             var sampleVectors = dataSetDbPedias.Select(x => x.Embeddings.ToArray()).ToList();
 
@@ -121,9 +123,14 @@ namespace ParquetAIVectorSearch
 
             for (int i = 0; i < numberOfBatches; i++)
             {
+                var stopWatchBatch = Stopwatch.StartNew();
+                stopWatchBatch.Start();
+
                 var batch = sampleVectors.Skip(i * batchSize).Take(batchSize).ToList();
                 graph.AddItems(batch);
                 Console.WriteLine($"\nAdded {i + 1} of {numberOfBatches} \n");
+
+                Console.WriteLine($"Time Taken for Batch {i+1}: {stopWatchBatch.ElapsedMilliseconds} ms.");
             }
 
             var endTimeOfGraphBuild = DateTime.Now;
@@ -171,7 +178,7 @@ namespace ParquetAIVectorSearch
 
             using (var f = File.OpenRead(filePath))
             {
-                graph = SmallWorld<float[], float>.DeserializeGraph(vectors, CosineDistance.SIMD, DefaultRandomGenerator.Instance, f, true);
+                graph = SmallWorld<float[], float>.DeserializeGraph(vectors, CosineDistance.DotProductDotNetOptimized, DefaultRandomGenerator.Instance, f, true);
             }
 
             stopWatch.Stop();
