@@ -34,6 +34,7 @@ namespace ParquetAIVectorSearch
                 MaxDegreeOfParallelism = (int) Math.Ceiling((Environment.ProcessorCount * 0.75))
             };
 
+            // Load Parquet Files in parallel
             Parallel.ForEach(parquet_files, parallelOptions, parquet_file =>
             {
                 using (var parquetReader = new ParquetFileReader(parquet_file))
@@ -96,7 +97,7 @@ namespace ParquetAIVectorSearch
 
 
             Console.WriteLine($"Build ANN Graph using HNSW...");
-            var NumVectors = 5000; // dataSetDbPedias.Count;
+            var NumVectors = dataSetDbPedias.Count;
             var batchSize = 5000;
 
             var hnswGraphParameters = new SmallWorld<float[], float>.Parameters()
@@ -109,11 +110,13 @@ namespace ParquetAIVectorSearch
                 hnswGraphParameters, threadSafe: true);
             var sampleVectors = dataSetDbPedias.Select(x => x.Embeddings.ToArray()).ToList();
 
-            for (int i = 0; i < (NumVectors / batchSize); i++)
+            var numberOfBatches = (int) Math.Ceiling((double) NumVectors / batchSize);
+
+            for (int i = 0; i < numberOfBatches; i++)
             {
                 var batch = sampleVectors.Skip(i * batchSize).Take(batchSize).ToList();
                 graph.AddItems(batch);
-                Console.WriteLine($"\nAdded {i + 1} of {NumVectors / batchSize}\n");
+                Console.WriteLine($"\nAdded {i + 1} of numberOfBatches \n");
             }
 
             var endTimeOfGraphBuild = DateTime.Now;
