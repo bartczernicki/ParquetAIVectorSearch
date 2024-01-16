@@ -5,10 +5,13 @@ using System.Collections.Concurrent;
 using System.IO;
 using System.Runtime.CompilerServices;
 
-namespace ParquetFilesPerformanceTest
+namespace ParquetAIVectorSearch
 {
     internal class Program
     {
+        private const string PARQUET_FILES_DIRECTORY = @"c:\data\dbpedia-entities-openai-1M\";
+        private const string PARQUET_FILE_PATH_SUFFIX = @"*.parquet";
+
         static void Main(string[] args)
         {
             Console.WriteLine("Parquet File Test");
@@ -18,13 +21,12 @@ namespace ParquetFilesPerformanceTest
             var recordCount = 0;
 
             // https://huggingface.co/datasets/KShivendu/dbpedia-entities-openai-1M 
-            var parquet_files_directory = @"e:\data\dbpedia-entities-openai-1M\";
-            var parquet_file_path_suffix = @"*.parquet";
-            var parquet_files = Directory.GetFiles(parquet_files_directory, parquet_file_path_suffix);
+
+            var parquet_files = Directory.GetFiles(PARQUET_FILES_DIRECTORY, PARQUET_FILE_PATH_SUFFIX);
 
             var parallelOptions = new ParallelOptions
             {
-                MaxDegreeOfParallelism = (int) (Environment.ProcessorCount * 0.75)
+                MaxDegreeOfParallelism = (int) Math.Ceiling((Environment.ProcessorCount * 0.75))
             };
 
             Parallel.ForEach(parquet_files, parallelOptions, parquet_file =>
@@ -81,7 +83,7 @@ namespace ParquetFilesPerformanceTest
                 }
             });
 
-            // get elapsed time
+            // Get elapsed time
             Console.WriteLine($"Time Taken: {(DateTime.Now - startTime).TotalSeconds} seconds");
             Console.WriteLine($"Total Records Processed: {recordCount}");
             Console.WriteLine($"Total Records in Concurrent Bag: {dataSetDbPedias.Count}");
