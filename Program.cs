@@ -6,6 +6,7 @@ using System.IO;
 using System.Runtime.CompilerServices;
 using HNSW.Net;
 using System.Collections.Frozen;
+using System.Numerics.Tensors;
 
 namespace ParquetAIVectorSearch
 {
@@ -74,7 +75,7 @@ namespace ParquetAIVectorSearch
                                     Id = ids[i],
                                     Title = titles[i],
                                     Text = texts[i],
-                                    Embeddings = embeddings[i].Select(x => x).ToList()
+                                    Embeddings = embeddings[i].Select(x => (float) x).ToList()
                                 };
                                 dataSetDbPedias.Add(item);
                             }
@@ -88,10 +89,15 @@ namespace ParquetAIVectorSearch
             });
 
             // Parquet File Load - Get elapsed time & counts
-            Console.WriteLine($"Time Taken: {(DateTime.Now - startTime).TotalSeconds} seconds");
+            var endTimeOfParquetLoad = DateTime.Now;
+            Console.WriteLine($"Time Taken: {(endTimeOfParquetLoad - startTime).TotalSeconds} seconds");
             Console.WriteLine($"Total Records Processed: {recordCount}");
             Console.WriteLine($"Total Records in Concurrent Bag: {dataSetDbPedias.Count}");
 
+
+            Console.WriteLine($"Build ANN Graph using HNSW...");
+            var NumVectors = dataSetDbPedias.Count;
+            var batchSize = 5000;
 
             var hnswGraphparameters = new SmallWorld<float[], float>.Parameters()
             {
@@ -101,10 +107,48 @@ namespace ParquetAIVectorSearch
 
             var graph = new SmallWorld<float[], float>(CosineDistance.SIMD, DefaultRandomGenerator.Instance,
                 hnswGraphparameters, threadSafe: true);
-            var sampleVectors = dataSetDbPedias.Select(x => x.Embeddings.ToArray()).ToList().ToFrozenSet();
+            var sampleVectors = dataSetDbPedias.Select(x => x.Embeddings.ToArray()).ToList();
+
+            for (int i = 0; i < (recordCount / batchSize); i++)
+            {
+                graph.AddItems(sampleVectors.Skip(i * batchSize).Take(batchSize).ToArray());
+                Console.WriteLine($"\nAdded {i + 1} of {NumVectors / batchSize}\n");
+            }
+
+            var endTimeOfGraphBuild = DateTime.Now;
+            Console.WriteLine($"Time Taken to build ANN Graph: {(endTimeOfGraphBuild - endTimeOfParquetLoad).TotalSeconds} seconds");
 
 
+            var searchVector = RandomVectors(1536, 1)[0];
+            var results = graph.KNNSearch(searchVector, 20);
 
+            //var results = new List<VectorScore>(NumVectors);
+            //for (var i = 0; i != NumVectors; i++)
+            //{
+            //    ReadOnlySpan<float> singleVector = sampleVectors.Slice(i, 1)[0];
+            //    var similarityScore = TensorPrimitives.Dot(searchVector, singleVector);
+
+            //    results.Add(new VectorScore { VectorIndex = i, SimilarityScore = similarityScore });
+            //}
+
+            var topMatches = results.OrderBy(a => a.Distance).Take(20);
+            var endTimeOfSearch = DateTime.Now;
+            Console.WriteLine($"Time Taken to search ANN Graph: {(endTimeOfSearch - endTimeOfGraphBuild).TotalSeconds} seconds");
+        }
+
+        private static List<float[]> RandomVectors(int vectorSize, int vectorsCount)
+        {
+            var vectors = new List<float[]>();
+
+            for (int i = 0; i < vectorsCount; i++)
+            {
+                var vector = new float[vectorSize];
+                DefaultRandomGenerator.Instance.NextFloats(vector);
+                VectorUtils.Normalize(vector);
+                vectors.Add(vector);
+            }
+
+            return vectors;
         }
     }
 }
