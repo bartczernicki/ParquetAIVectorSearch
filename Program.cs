@@ -1,15 +1,7 @@
-﻿using ParquetSharp;
-using ParquetSharp.Arrow;
-using ParquetSharp.RowOriented;
+﻿using HNSW.Net;
+using ParquetSharp;
 using System.Collections.Concurrent;
-using System.IO;
-using System.Runtime.CompilerServices;
-using HNSW.Net;
-using System.Collections.Frozen;
-using System.Numerics.Tensors;
 using System.Diagnostics;
-using System.Runtime.Serialization.Formatters.Binary;
-using System.Runtime.InteropServices;
 
 namespace ParquetAIVectorSearch
 {
