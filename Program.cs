@@ -92,6 +92,10 @@ namespace ParquetAIVectorSearch
                 }
             });
 
+            // Write out the first 1000 records to a json file
+            var json = System.Text.Json.JsonSerializer.Serialize(dataSetDbPedias.Take(100));
+            File.WriteAllText(Path.Combine(PARQUET_FILES_DIRECTORY, "dbpedias.json"), json);
+
             // Parquet File Load - Get elapsed time & counts
             var endTimeOfParquetLoad = DateTime.Now;
             Console.WriteLine($"Time Taken: {(endTimeOfParquetLoad - startTime).TotalSeconds} seconds");
@@ -115,7 +119,7 @@ namespace ParquetAIVectorSearch
                 InitialDistanceCacheSize = NumVectors * 1024
         };
 
-            var graph = new SmallWorld<float[], float>(CosineDistance.DotProductDotNetOptimized, DefaultRandomGenerator.Instance,
+            var graph = new SmallWorld<float[], float>(DotProduct.DotProductOptimized, DefaultRandomGenerator.Instance,
                 hnswGraphParameters, threadSafe: true);
             var sampleVectors = dataSetDbPedias.Select(x => x.Embeddings.ToArray()).ToList();
 
@@ -178,7 +182,7 @@ namespace ParquetAIVectorSearch
 
             using (var f = File.OpenRead(filePath))
             {
-                graph = SmallWorld<float[], float>.DeserializeGraph(vectors, CosineDistance.DotProductDotNetOptimized, DefaultRandomGenerator.Instance, f, true);
+                graph = SmallWorld<float[], float>.DeserializeGraph(vectors, DotProduct.DotProductOptimized, DefaultRandomGenerator.Instance, f, true);
             }
 
             stopWatch.Stop();
