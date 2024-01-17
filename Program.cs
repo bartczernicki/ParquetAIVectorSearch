@@ -17,7 +17,7 @@ namespace ParquetAIVectorSearch
     {
         // Note this will not run on ARM processors
 
-        private const string PARQUET_FILES_DIRECTORY = @"e:\data\dbpedia-entities-openai-1M\";
+        private const string PARQUET_FILES_DIRECTORY = @"c:\data\dbpedia-entities-openai-1M\";
         private const string PARQUET_FILE_PATH_SUFFIX = @"*.parquet";
         private const int M_PARAMETER = 10; // determines the number of neighbors to consider when adding a new node to the graph
 
@@ -125,7 +125,7 @@ namespace ParquetAIVectorSearch
                 InitialDistanceCacheSize = NumVectors * 1024
         };
 
-            var graph = new SmallWorld<float[], float>(DotProduct.DotProductOptimized, DefaultRandomGenerator.Instance,
+            var graph = new SmallWorld<float[], float>(DotProductDistance.DotProductOptimized, DefaultRandomGenerator.Instance,
                 hnswGraphParameters, threadSafe: true);
 
             // enforce order as this is important for the graph to be built correctly
@@ -190,7 +190,7 @@ namespace ParquetAIVectorSearch
 
             using (var f = File.OpenRead(filePath))
             {
-                graph = SmallWorld<float[], float>.DeserializeGraph(vectors, DotProduct.DotProductOptimized, DefaultRandomGenerator.Instance, f, true);
+                graph = SmallWorld<float[], float>.DeserializeGraph(vectors, DotProductDistance.DotProductOptimized, DefaultRandomGenerator.Instance, f, true);
             }
 
             stopWatch.Stop();
