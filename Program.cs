@@ -9,7 +9,7 @@ namespace ParquetAIVectorSearch
     {
         // Note this will not run on ARM processors
 
-        private const string PARQUET_FILES_DIRECTORY = @"c:\data\dbpedia-entities-openai-1M\";
+        private const string PARQUET_FILES_DIRECTORY = @"e:\data\dbpedia-entities-openai-1M\";
         private const string PARQUET_FILE_PATH_SUFFIX = @"*.parquet";
         private const int M_PARAMETER = 10; // determines the number of neighbors to consider when adding a new node to the graph
 
@@ -104,7 +104,6 @@ namespace ParquetAIVectorSearch
             var NumVectors = dataSetDbPedias.Count;
             var batchSize = 10000;
 
-
             var hnswGraphParameters = new SmallWorld<float[], float>.Parameters()
             {
                 M = M_PARAMETER,
@@ -113,48 +112,80 @@ namespace ParquetAIVectorSearch
                 KeepPrunedConnections = true,
                 EnableDistanceCacheForConstruction = true,
                 NeighbourHeuristic = NeighbourSelectionHeuristic.SelectHeuristic,
-                InitialItemsSize = NumVectors,
-                InitialDistanceCacheSize = NumVectors * 1024
-        };
+                InitialItemsSize = 100000,
+                InitialDistanceCacheSize = 100000 * 1024
+            };
+
+            var graphs = new List<SmallWorld<float[], float>>();
+
+            for (int i = 0; i != 10; i++)
+            {
+                var graphLocal = new SmallWorld<float[], float>(DotProductDistance.DotProductOptimized, DefaultRandomGenerator.Instance,
+                    hnswGraphParameters, threadSafe: true);
+
+                graphs.Add(graphLocal);
+            }   
 
             var graph = new SmallWorld<float[], float>(DotProductDistance.DotProductOptimized, DefaultRandomGenerator.Instance,
                 hnswGraphParameters, threadSafe: true);
 
-            // enforce order as this is important for the graph to be built correctly
-            var sampleVectors = dataSetDbPedias.OrderBy(a => a.Id).Select(x => x.Embeddings.ToArray()).ToList();
+            // Enforce order as this is important for the graph to be built correctly
+            var dataSetDbPediasOrdered = dataSetDbPedias.OrderBy(a => a.Id).ToList();
+            var sampleVectors = dataSetDbPediasOrdered.Select(x => x.Embeddings.ToArray()).ToList();
+
+            // Chunk the sampleVector into 10 equal batches
+            var dbPediasOrderedPartitions = dataSetDbPediasOrdered.Chunk(sampleVectors.Count / 10).ToList();
 
             var numberOfBatches = (int) Math.Ceiling((double) NumVectors / batchSize);
 
-            for (int i = 0; i < numberOfBatches; i++)
+            Parallel.For(0, dbPediasOrderedPartitions.Count, parallelOptions, i =>
             {
-                var stopWatchBatch = Stopwatch.StartNew();
-                stopWatchBatch.Start();
+                var partition = dbPediasOrderedPartitions[i].Select(x => x.Embeddings.ToArray()).ToList();
+                var numberOfBatches = (int) Math.Ceiling((double)partition.Count / batchSize);
 
-                var batch = sampleVectors.Skip(i * batchSize).Take(batchSize).ToList();
-                graph.AddItems(batch);
-                Console.WriteLine($"\nAdded {i + 1} of {numberOfBatches} \n");
+                for (int j = 0; j < numberOfBatches; j++)
+                {
+                    var partitionBatch = partition.Skip(j * batchSize).Take(batchSize).ToList();
+                    graphs[i].AddItems(partitionBatch);
+                    Console.WriteLine($"Vector Partition: {i+1}, Added {j + 1} of {numberOfBatches} \n");
+                }
+            });
 
-                Console.WriteLine($"Time Taken for Batch {i+1}: {stopWatchBatch.ElapsedMilliseconds} ms.");
-            }
+            //// Option 2 - Process Sequentially all of the batches to a single graph
+            //for (int i = 0; i < numberOfBatches; i++)
+            //{
+            //    var stopWatchBatch = Stopwatch.StartNew();
+            //    stopWatchBatch.Start();
+
+            //    var batch = sampleVectors.Skip(i * batchSize).Take(batchSize).ToList();
+            //    graph.AddItems(batch);
+            //    Console.WriteLine($"\nAdded {i + 1} of {numberOfBatches} \n");
+
+            //    Console.WriteLine($"Time Taken for Batch {i+1}: {stopWatchBatch.ElapsedMilliseconds} ms.");
+            //}
 
             var endTimeOfGraphBuild = DateTime.Now;
             Console.WriteLine($"Time Taken to build ANN Graph: {(endTimeOfGraphBuild - endTimeOfParquetLoad).TotalSeconds} seconds");
 
+            for(int i = 0; i != 10; i++)
+            {
+                SaveHNSWGraph(graphs[i], PARQUET_FILES_DIRECTORY, $"graph_M{M_PARAMETER}_partition{i+1}.hnsw");
+            }
 
-            var searchVector = sampleVectors[0];// RandomVectors(1536, 1)[0];
-            var results = graph.KNNSearch(searchVector, 20);
+            //var searchVector = sampleVectors[0];// RandomVectors(1536, 1)[0];
+            //var results = graph.KNNSearch(searchVector, 20);
 
-            var topMatches = results.OrderBy(a => a.Distance).Take(20);
-            var endTimeOfSearch = DateTime.Now;
-            Console.WriteLine($"Time Taken to search ANN Graph: {(endTimeOfSearch - endTimeOfGraphBuild).TotalSeconds} seconds");
+            //var topMatches = results.OrderBy(a => a.Distance).Take(20);
+            //var endTimeOfSearch = DateTime.Now;
+            //Console.WriteLine($"Time Taken to search ANN Graph: {(endTimeOfSearch - endTimeOfGraphBuild).TotalSeconds} seconds");
 
             // Serialize the HNSW Graph & Persist to disk
-            SaveHNSWGraph(graph, PARQUET_FILES_DIRECTORY, GRAPH_FILE_NAME);
+            // SaveHNSWGraph(graph, PARQUET_FILES_DIRECTORY, GRAPH_FILE_NAME);
 
             // De-Serialize the HNSW Graph & Persist to disk
-            var loadedGraph = LoadHNSWGraph(PARQUET_FILES_DIRECTORY, GRAPH_FILE_NAME, sampleVectors);
+            //var loadedGraph = LoadHNSWGraph(PARQUET_FILES_DIRECTORY, GRAPH_FILE_NAME, sampleVectors);
 
-            var loadedGraphResults = loadedGraph.KNNSearch(searchVector, 20);
+            //var loadedGraphResults = loadedGraph.KNNSearch(searchVector, 20);
         }
 
         private static void SaveHNSWGraph(SmallWorld<float[], float> world, string directoryName, string fileName)
