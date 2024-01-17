@@ -123,7 +123,9 @@ namespace ParquetAIVectorSearch
 
             var graph = new SmallWorld<float[], float>(DotProduct.DotProductOptimized, DefaultRandomGenerator.Instance,
                 hnswGraphParameters, threadSafe: true);
-            var sampleVectors = dataSetDbPedias.Select(x => x.Embeddings.ToArray()).ToList();
+
+            // enforce order as this is important for the graph to be built correctly
+            var sampleVectors = dataSetDbPedias.OrderBy(a => a.Id).Select(x => x.Embeddings.ToArray()).ToList();
 
             var numberOfBatches = (int) Math.Ceiling((double) NumVectors / batchSize);
 
