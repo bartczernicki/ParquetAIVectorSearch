@@ -17,9 +17,11 @@ namespace ParquetAIVectorSearch
     {
         // Note this will not run on ARM processors
 
-        private const string PARQUET_FILES_DIRECTORY = @"c:\data\dbpedia-entities-openai-1M\";
+        private const string PARQUET_FILES_DIRECTORY = @"e:\data\dbpedia-entities-openai-1M\";
         private const string PARQUET_FILE_PATH_SUFFIX = @"*.parquet";
-        private const string GRAPH_FILE_NAME_SMALL = @"CompleteGraph.hnsw";
+        private const int M_PARAMETER = 10; // determines the number of neighbors to consider when adding a new node to the graph
+
+
 
         static void Main(string[] args)
         {
@@ -28,6 +30,9 @@ namespace ParquetAIVectorSearch
             var startTime = DateTime.Now;
             ConcurrentBag<DbPedia> dataSetDbPedias = new ConcurrentBag<DbPedia>();
             var recordCount = 0;
+
+            // create name of file using the M_PARAMETER
+            var GRAPH_FILE_NAME = $"graph_M{M_PARAMETER}.hnsw";
 
             // https://huggingface.co/datasets/KShivendu/dbpedia-entities-openai-1M 
             var parquet_files = Directory.GetFiles(PARQUET_FILES_DIRECTORY, PARQUET_FILE_PATH_SUFFIX);
@@ -103,10 +108,11 @@ namespace ParquetAIVectorSearch
             var NumVectors = dataSetDbPedias.Count;
             var batchSize = 10000;
 
+
             var hnswGraphParameters = new SmallWorld<float[], float>.Parameters()
             {
-                M = 10,
-                LevelLambda = 1 / Math.Log(10), // should match M
+                M = M_PARAMETER,
+                LevelLambda = 1 / Math.Log(M_PARAMETER), // should match M
                 ExpandBestSelection = true,
                 KeepPrunedConnections = true,
                 EnableDistanceCacheForConstruction = true,
@@ -115,7 +121,7 @@ namespace ParquetAIVectorSearch
                 InitialDistanceCacheSize = NumVectors * 1024
         };
 
-            var graph = new SmallWorld<float[], float>(CosineDistance.DotProductDotNetOptimized, DefaultRandomGenerator.Instance,
+            var graph = new SmallWorld<float[], float>(DotProduct.DotProductOptimized, DefaultRandomGenerator.Instance,
                 hnswGraphParameters, threadSafe: true);
             var sampleVectors = dataSetDbPedias.Select(x => x.Embeddings.ToArray()).ToList();
 
@@ -145,10 +151,10 @@ namespace ParquetAIVectorSearch
             Console.WriteLine($"Time Taken to search ANN Graph: {(endTimeOfSearch - endTimeOfGraphBuild).TotalSeconds} seconds");
 
             // Serialize the HNSW Graph & Persist to disk
-            SaveHNSWGraph(graph, PARQUET_FILES_DIRECTORY, GRAPH_FILE_NAME_SMALL);
+            SaveHNSWGraph(graph, PARQUET_FILES_DIRECTORY, GRAPH_FILE_NAME);
 
             // De-Serialize the HNSW Graph & Persist to disk
-            var loadedGraph = LoadHNSWGraph(PARQUET_FILES_DIRECTORY, GRAPH_FILE_NAME_SMALL, sampleVectors);
+            var loadedGraph = LoadHNSWGraph(PARQUET_FILES_DIRECTORY, GRAPH_FILE_NAME, sampleVectors);
 
             var loadedGraphResults = loadedGraph.KNNSearch(searchVector, 20);
         }
@@ -178,7 +184,7 @@ namespace ParquetAIVectorSearch
 
             using (var f = File.OpenRead(filePath))
             {
-                graph = SmallWorld<float[], float>.DeserializeGraph(vectors, CosineDistance.DotProductDotNetOptimized, DefaultRandomGenerator.Instance, f, true);
+                graph = SmallWorld<float[], float>.DeserializeGraph(vectors, DotProduct.DotProductOptimized, DefaultRandomGenerator.Instance, f, true);
             }
 
             stopWatch.Stop();
