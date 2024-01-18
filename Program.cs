@@ -9,7 +9,7 @@ namespace ParquetAIVectorSearch
     {
         // Note this will not run on ARM processors
 
-        private const string PARQUET_FILES_DIRECTORY = @"e:\data\dbpedia-entities-openai-1M\";
+        private const string PARQUET_FILES_DIRECTORY = @"c:\data\dbpedia-entities-openai-1M\";
         private const string PARQUET_FILE_PATH_SUFFIX = @"*.parquet";
         private const int M_PARAMETER = 10; // determines the number of neighbors to consider when adding a new node to the graph
 
@@ -93,6 +93,10 @@ namespace ParquetAIVectorSearch
             var json = System.Text.Json.JsonSerializer.Serialize(dataSetDbPedias.Take(100));
             File.WriteAllText(Path.Combine(PARQUET_FILES_DIRECTORY, "dbpedias.json"), json);
 
+            // Enforce order as this is important for the graph to be built correctly
+            var dataSetDbPediasOrdered = dataSetDbPedias.OrderBy(a => a.Id).ToList();
+            var sampleVectors = dataSetDbPediasOrdered.Select(x => x.Embeddings.ToArray()).ToList();
+
             // Parquet File Load - Get elapsed time & counts
             var endTimeOfParquetLoad = DateTime.Now;
             Console.WriteLine($"Time Taken: {(endTimeOfParquetLoad - startTime).TotalSeconds} seconds");
@@ -117,7 +121,6 @@ namespace ParquetAIVectorSearch
             };
 
             var graphs = new List<SmallWorld<float[], float>>();
-
             for (int i = 0; i != 10; i++)
             {
                 var graphLocal = new SmallWorld<float[], float>(DotProductDistance.DotProductOptimized, DefaultRandomGenerator.Instance,
@@ -126,12 +129,8 @@ namespace ParquetAIVectorSearch
                 graphs.Add(graphLocal);
             }   
 
-            var graph = new SmallWorld<float[], float>(DotProductDistance.DotProductOptimized, DefaultRandomGenerator.Instance,
-                hnswGraphParameters, threadSafe: true);
-
-            // Enforce order as this is important for the graph to be built correctly
-            var dataSetDbPediasOrdered = dataSetDbPedias.OrderBy(a => a.Id).ToList();
-            var sampleVectors = dataSetDbPediasOrdered.Select(x => x.Embeddings.ToArray()).ToList();
+            //var graph = new SmallWorld<float[], float>(DotProductDistance.DotProductOptimized, DefaultRandomGenerator.Instance,
+            //    hnswGraphParameters, threadSafe: true);
 
             // Chunk the sampleVector into 10 equal batches
             var dbPediasOrderedPartitions = dataSetDbPediasOrdered.Chunk(sampleVectors.Count / 10).ToList();
