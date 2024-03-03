@@ -10,7 +10,7 @@ namespace ParquetAIVectorSearch
     {
         // Note this will not run on ARM processors
 
-        private const string PARQUET_FILES_DIRECTORY = @"e:\data\dbpedia-entities-openai-1M\";
+        private const string PARQUET_FILES_DIRECTORY = @"c:\data\dbpedia-entities-openai-1M\";
         private const string PARQUET_FILE_PATH_SUFFIX = @"*.parquet";
         private const int M_PARAMETER = 10; // determines the number of neighbors to consider when adding a new node to the graph
         private const int BATCHSIZE = 10000;
@@ -102,6 +102,10 @@ namespace ParquetAIVectorSearch
             // Write out the first 1000 records to a json file
             var json = System.Text.Json.JsonSerializer.Serialize(dataSetDbPedias.Take(100));
             File.WriteAllText(Path.Combine(PARQUET_FILES_DIRECTORY, "dbpedias.json"), json);
+
+            // Enforce order as this is important for the graph to be built correctly
+            var dataSetDbPediasOrdered = dataSetDbPedias.OrderBy(a => a.Id).ToList();
+            var sampleVectors = dataSetDbPediasOrdered.Select(x => x.Embeddings.ToArray()).ToList();
 
             // Parquet File Load - Get elapsed time & counts
             var endTimeOfParquetLoad = DateTime.Now;
